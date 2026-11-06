@@ -224,7 +224,7 @@ flowchart TD
     A --> S["Resposta ao usuário"]
 ```
 
-O `agente_planejador.py` solicita um plano com até quatro ações. Cada ação contém `ferramenta`, `consulta`, `limite`, `ano` e `detalhar`. O código filtra ferramentas desconhecidas e restringe o limite de resultados ao intervalo de 1 a 5. Se nenhuma ação válida restar, usa `direto`.
+O `agente_planejador.py` solicita um plano com até quatro ações. Cada ação contém `ferramenta`, `consulta`, `limite`, `ano` e `detalhar`. O código filtra ferramentas desconhecidas e restringe o limite de resultados ao intervalo de 1 a 5. O plano também informa a categoria: `geral`, `rag`, `filmes` ou `mista`. Perguntas gerais usam `direto`; nas categorias `rag` e `filmes`, o código filtra ferramentas de outras fontes. Sem ações válidas, a categoria `rag` usa uma busca padrão, `filmes` retorna um plano vazio com erro, e as demais usam `direto`.
 
 | Ferramenta | Finalidade |
 | --- | --- |
@@ -263,13 +263,24 @@ O `teste_agentes.py` usa `.env.extensao` e mostra o plano, os resultados (limita
 
 O teste de WhatsApp usa a mesma sessão dos bots e deve ser executado separadamente. O teste de RAG mostra os trechos recuperados, sem gerar uma resposta de conversação.
 
+## Identificação de filmes na versão com agentes
+
+O motor normaliza títulos e inclui três correspondências didáticas: `Interestelar` → `Interstellar` (2014), `A Origem` → `Inception` (2010) e `Matrix` → `The Matrix` (1999). Outros títulos dependem das consultas à OMDb e do planejamento do modelo.
+
+A identificação tenta a consulta por título e, se não obtiver candidatos, realiza uma busca mais ampla. Os candidatos são comparados pelo título normalizado e pelos filtros de ano e tipo quando informados. O código exige pontuação de pelo menos 0,92 e sinaliza ambiguidade quando os dois melhores candidatos aceitos têm diferença inferior a 0,03. Esses valores são heurísticas de comparação, não probabilidades de acerto.
+
+Quando uma obra é selecionada, seus detalhes são consultados pelo IMDb ID retornado pela API. O analista é instruído a não afirmar que identificou a obra quando `identificado` for falso. A pesquisa OMDb é baseada em títulos; o projeto não oferece busca geral por diretor, gênero ou maiores bilheterias.
+
 ## Limitações e observações
 
 - O histórico fica apenas na memória do processo e é perdido ao reiniciar. No bot estendido, apenas `/ia` usa esse histórico; as consultas RAG e OMDb são independentes.
 - PDFs digitalizados sem camada de texto precisam de OCR externo antes da indexação; o projeto não implementa OCR.
 - A busca RAG retorna os trechos mais semelhantes sem aplicar um limiar mínimo de relevância. As referências exibidas indicam os trechos recuperados e não garantem que toda afirmação da resposta esteja sustentada por eles.
 - O índice JSON é carregado e percorrido a cada busca, uma abordagem simples para fins didáticos e bases pequenas.
-- O bloqueio usado na conversação com histórico permanece ativo durante a consulta ao Ollama, podendo fazer outras conversas aguardarem.
+- O bloqueio usado na conversação com histórico permanece ativo durante a consulta ao Ollama. No bot com agentes, ele abrange planejamento, ferramentas e análise, serializando o processamento entre conversas.
+- A versão com agentes realiza duas chamadas ao modelo por pergunta, além das consultas às ferramentas, podendo levar mais tempo que a versão básica.
+- A seleção das ferramentas e a redação final dependem do modelo; os limites do plano e a validação de títulos não garantem respostas corretas.
+- O planejamento exige suporte ao formato estruturado do Ollama e do modelo. Um JSON inválido pode interromper o processamento da pergunta.
 - As dependências não têm versões fixadas em `requirements.txt`.
 - Os bots imprimem identificadores de conversa e textos recebidos no terminal.
 
@@ -282,6 +293,8 @@ O teste de WhatsApp usa a mesma sessão dos bots e deve ser executado separadame
 | Modelo de embeddings diferente | Reindexe com o mesmo `EMBEDDING_MODEL` usado nas consultas |
 | Nenhum texto extraído | Verifique se os PDFs têm texto selecionável |
 | Falha nas consultas de filmes | Chave OMDb configurada, conexão com a internet e título pesquisado |
+| Falha no planejamento dos agentes | Confira o serviço Ollama, o modelo e o suporte ao esquema JSON; consulte o erro no terminal |
+| Filme ambíguo na versão com agentes | Informe o título original e o ano para ajudar a identificação |
 | Bot não responde | Confira a conexão, use outra conta e envie uma mensagem privada com texto; no bot estendido, use um comando válido |
 
 ## Publicação no GitHub

@@ -2,15 +2,32 @@
 import os
 import json
 import requests
+
 from dotenv import load_dotenv
 
 load_dotenv(".env.extensao", override=True)
 
 URL = os.getenv(
-    "OLLAMA_URL", "http://localhost:11434"
+    "OLLAMA_URL",
+    "http://localhost:11434"
 ).rstrip("/")
 
-MODELO = os.getenv("OLLAMA_MODEL", "qwen2.5:3b")
+MODELO = os.getenv(
+    "OLLAMA_MODEL",
+    "qwen2.5:3b"
+)
+
+
+# ==========================================
+# CATEGORIAS E FERRAMENTAS
+# ==========================================
+
+CATEGORIAS = [
+    "geral",
+    "rag",
+    "filmes",
+    "mista"
+]
 
 FERRAMENTAS = [
     "direto",
@@ -21,9 +38,18 @@ FERRAMENTAS = [
     "contexto_anterior"
 ]
 
+
+# ==========================================
+# ESQUEMA JSON
+# ==========================================
+
 ESQUEMA = {
     "type": "object",
     "properties": {
+        "categoria": {
+            "type": "string",
+            "enum": CATEGORIAS
+        },
         "acoes": {
             "type": "array",
             "items": {
@@ -33,10 +59,18 @@ ESQUEMA = {
                         "type": "string",
                         "enum": FERRAMENTAS
                     },
-                    "consulta": {"type": "string"},
-                    "limite": {"type": "integer"},
-                    "ano": {"type": "string"},
-                    "detalhar": {"type": "boolean"}
+                    "consulta": {
+                        "type": "string"
+                    },
+                    "limite": {
+                        "type": "integer"
+                    },
+                    "ano": {
+                        "type": "string"
+                    },
+                    "detalhar": {
+                        "type": "boolean"
+                    }
                 },
                 "required": [
                     "ferramenta",
@@ -48,105 +82,216 @@ ESQUEMA = {
             }
         }
     },
-    "required": ["acoes"]
+    "required": [
+        "categoria",
+        "acoes"
+    ]
 }
 
+
+# ==========================================
+# SYSTEM PROMPT - AGENTE 1
+# ==========================================
+
 SYSTEM_PROMPT = """
-Voce e o AGENTE 1, um planejador de consultas.
+Voce e o AGENTE 1, especializado em
+classificar perguntas e planejar consultas.
 
-Sua unica tarefa e selecionar ferramentas e
-produzir um plano em JSON.
+Sua tarefa e determinar qual fonte deve
+responder a pergunta do usuario.
 
-FERRAMENTAS DISPONIVEIS:
+EXISTEM QUATRO CATEGORIAS:
+
+1. geral
+Perguntas gerais sobre qualquer assunto.
+Exemplos:
+- O que e Python?
+- Explique polimorfismo.
+- O que e inteligencia artificial?
+- Como funciona uma rede de computadores?
+- Quanto e 10 vezes 20?
+- Escreva um codigo Python.
+- Explique a taxonomia de Bloom.
+- O que e RAG?
+
+Ferramenta: direto.
+
+IMPORTANTE:
+Uma pergunta geral sobre RAG nao significa
+que o usuario quer consultar documentos.
+RAG tambem pode ser apenas um assunto.
+
+2. rag
+Quando o usuario deseja pesquisar
+os documentos indexados.
+
+Exemplos:
+- Quais artigos estao indexados?
+- Liste os PDFs cadastrados.
+- Segundo meus documentos, o que e RAG?
+- O que os artigos dizem sobre IA?
+- Compare os documentos sobre aprendizado.
+
+Ferramentas:
+rag_lista ou rag_busca.
+
+3. filmes
+Quando o usuario pergunta sobre filmes
+ou series e precisa de informacoes da OMDb.
+
+Exemplos:
+- Quem dirigiu Interestelar?
+- Qual a duracao de Matrix?
+- Compare Batman e Superman.
+- Pesquise cinco filmes com Batman no titulo.
+- Qual a avaliacao IMDb de Oppenheimer?
+
+Ferramentas:
+omdb_titulo ou omdb_busca.
+
+4. mista
+Quando a pergunta precisa combinar
+diferentes fontes.
+
+Exemplos:
+- Compare o conceito de IA nos meus PDFs
+  com o filme Ex Machina.
+- Relacione os documentos sobre robos
+  com o filme Eu, Robo.
+
+Permite combinar RAG e OMDb.
+
+FERRAMENTAS:
 
 direto:
-Perguntas gerais que nao exigem dados externos.
+Conhecimento geral do modelo Ollama.
 
 rag_lista:
-Listar os documentos indexados.
-Use quando perguntarem quais PDFs ou artigos
-estao cadastrados.
+Lista os documentos indexados.
 
 rag_busca:
-Pesquisar conteudo nos documentos PDF.
-Informe termos de pesquisa relevantes.
-O limite representa a quantidade de trechos.
+Busca trechos relevantes nos PDFs.
 
 omdb_titulo:
-Consultar detalhes de um filme ou serie.
-A consulta deve conter o titulo.
-Informe o ano quando conhecido.
+Consulta detalhes de um filme especifico.
 
 omdb_busca:
-Procurar varios filmes ou series pelo titulo,
-palavra-chave ou parte do titulo.
-A OMDb nao oferece busca geral por diretor,
-genero ou maiores bilheterias.
-Nao use essas condicoes como se fossem filtros.
+Pesquisa varios titulos na OMDb.
 
 contexto_anterior:
-Reutilizar resultados da consulta anterior,
-quando o usuario pedir uma continuacao.
+Reutiliza resultados da consulta anterior
+quando a pergunta depende dessa consulta.
 
-REGRAS:
-1. Escolha a ferramenta mais adequada.
-2. Utilize varias acoes quando necessario.
-3. Para comparar dois filmes, consulte ambos.
-4. Pode combinar RAG e OMDb.
-5. Nunca invente titulos ou documentos.
-6. Use no maximo quatro acoes.
-7. Use limite entre 1 e 5.
-8. Para omdb_busca, detalhar=true permite
-   obter detalhes dos resultados encontrados.
-9. Utilize rag_lista quando a pergunta solicitar
-   os nomes dos arquivos indexados.
-10. Considere o historico para resolver perguntas
-    de continuacao.
-11. Se nenhuma ferramenta for necessaria,
-    escolha direto.
-12. Responda exclusivamente com JSON valido.
+REGRAS OBRIGATORIAS:
 
-REGRAS ADICIONAIS PARA FILMES:
+1. Classifique primeiro a categoria.
 
-13. Ao identificar um filme conhecido por um
-    titulo traduzido, prefira o titulo original
-    quando tiver certeza da correspondencia.
+2. Para categoria geral, use somente direto.
 
-14. Quando souber o ano de lancamento com
-    seguranca, informe o ano na acao.
+3. Nao consulte OMDb para perguntas de
+   programacao, ciencias, matematica,
+   historia ou assuntos gerais.
 
-15. Diferencie filmes de series.
+4. Nao consulte o RAG apenas porque
+   a pergunta menciona inteligencia
+   artificial ou aprendizado de maquina.
 
-16. Para perguntas sobre um filme especifico,
-    utilize omdb_titulo.
+5. Use RAG quando o usuario se referir
+   aos seus PDFs, documentos, artigos
+   ou base de conhecimento.
 
-17. Para buscar varios titulos que compartilham
-    palavras, utilize omdb_busca.
+6. Use OMDb para consultas factuais
+   sobre filmes e series especificos.
 
-18. Para comparar filmes, crie uma acao
-    separada para cada obra.
+7. Para comparar varios filmes, crie
+   uma acao para cada titulo.
 
-19. Nao invente titulos originais, anos
-    ou identificadores IMDb.
+8. Para pesquisar varios titulos,
+   utilize omdb_busca.
 
-20. Quando houver ambiguidade, preserve
-    o titulo informado pelo usuario.
+9. Se souber o titulo original de um
+   filme com seguranca, utilize-o.
 
+10. Se souber o ano com seguranca,
+    informe o ano.
 
-Formato esperado:
+11. Nunca invente titulos ou anos.
+
+12. Pode combinar fontes quando necessario.
+
+13. Use no maximo quatro acoes.
+
+14. O limite deve ficar entre 1 e 5.
+
+15. Considere o historico da conversa.
+
+16. Responda somente com JSON valido.
+
+EXEMPLO - PERGUNTA GERAL:
+
 {
+  "categoria": "geral",
   "acoes": [
     {
-      "ferramenta": "rag_busca",
-      "consulta": "aprendizado de maquina",
-      "limite": 3,
+      "ferramenta": "direto",
+      "consulta": "O que e Python?",
+      "limite": 1,
       "ano": "",
       "detalhar": false
     }
   ]
 }
+
+EXEMPLO - DOCUMENTOS:
+
+{
+  "categoria": "rag",
+  "acoes": [
+    {
+      "ferramenta": "rag_lista",
+      "consulta": "",
+      "limite": 5,
+      "ano": "",
+      "detalhar": false
+    }
+  ]
+}
+
+EXEMPLO - FILME:
+
+{
+  "categoria": "filmes",
+  "acoes": [
+    {
+      "ferramenta": "omdb_titulo",
+      "consulta": "Interstellar",
+      "limite": 1,
+      "ano": "2014",
+      "detalhar": true
+    }
+  ]
+}
 """
 
+
+# ==========================================
+# ACAO PADRAO PARA PERGUNTAS GERAIS
+# ==========================================
+
+def acao_direta(pergunta):
+
+    return {
+        "ferramenta": "direto",
+        "consulta": pergunta,
+        "limite": 1,
+        "ano": "",
+        "detalhar": False
+    }
+
+
+# ==========================================
+# PLANEJAR PERGUNTA
+# ==========================================
 
 def planejar(pergunta, historico=None):
 
@@ -172,23 +317,48 @@ def planejar(pergunta, historico=None):
             "messages": mensagens,
             "format": ESQUEMA,
             "stream": False,
-            "options": {"temperature": 0}
+            "options": {
+                "temperature": 0
+            }
         },
         timeout=180
     )
 
     resposta.raise_for_status()
 
-    conteudo = resposta.json()["message"]["content"]
+    conteudo = resposta.json()[
+        "message"
+    ]["content"]
 
     plano = json.loads(conteudo)
 
-    if not isinstance(plano.get("acoes"), list):
-        raise ValueError("Plano sem lista de acoes.")
+    categoria = plano.get(
+        "categoria", "geral"
+    )
+
+    if categoria not in CATEGORIAS:
+        categoria = "geral"
+
+    # --------------------------------------
+    # PERGUNTAS GERAIS
+    # --------------------------------------
+
+    if categoria == "geral":
+
+        return {
+            "categoria": "geral",
+            "acoes": [
+                acao_direta(pergunta)
+            ]
+        }
+
+    # --------------------------------------
+    # VALIDAR ACOES
+    # --------------------------------------
 
     acoes = []
 
-    for acao in plano["acoes"][:4]:
+    for acao in plano.get("acoes", [])[:4]:
 
         if not isinstance(acao, dict):
             continue
@@ -200,8 +370,21 @@ def planejar(pergunta, historico=None):
 
         try:
             limite = int(acao.get("limite", 3))
-        except (ValueError, TypeError):
+        except (TypeError, ValueError):
             limite = 3
+
+        # Evitar ferramentas de outra categoria
+        if categoria == "rag" and ferramenta not in (
+            "rag_lista", "rag_busca",
+            "contexto_anterior"
+        ):
+            continue
+
+        if categoria == "filmes" and ferramenta not in (
+            "omdb_titulo", "omdb_busca",
+            "contexto_anterior"
+        ):
+            continue
 
         acoes.append({
             "ferramenta": ferramenta,
@@ -212,16 +395,42 @@ def planejar(pergunta, historico=None):
             "ano": str(
                 acao.get("ano") or ""
             ).strip(),
-            "detalhar": acao.get("detalhar") is True
+            "detalhar": (
+                acao.get("detalhar") is True
+            )
         })
 
-    if not acoes:
-        acoes = [{
-            "ferramenta": "direto",
-            "consulta": pergunta,
-            "limite": 1,
-            "ano": "",
-            "detalhar": False
-        }]
+    # --------------------------------------
+    # PLANO SEM ACOES VALIDAS
+    # --------------------------------------
 
-    return {"acoes": acoes}
+    if not acoes:
+
+        if categoria == "rag":
+            acoes = [{
+                "ferramenta": "rag_busca",
+                "consulta": pergunta,
+                "limite": 3,
+                "ano": "",
+                "detalhar": False
+            }]
+
+        elif categoria == "filmes":
+            # Nao inventar um titulo se o plano
+            # nao identificou uma obra.
+            return {
+                "categoria": "filmes",
+                "acoes": [],
+                "erro": (
+                    "Nao foi possivel identificar "
+                    "um titulo para consulta."
+                )
+            }
+
+        else:
+            acoes = [acao_direta(pergunta)]
+
+    return {
+        "categoria": categoria,
+        "acoes": acoes
+    }
