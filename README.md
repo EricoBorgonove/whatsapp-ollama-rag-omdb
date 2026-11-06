@@ -252,9 +252,14 @@ Estes scripts são demonstrações de integração, não uma suíte automatizada
 # Recuperação de trechos; exige Ollama e índice disponível
 .\.venv\Scripts\python.exe teste_rag.py
 
+# Fluxo de planejamento, ferramentas e resposta no terminal; digite sair para encerrar
+.\.venv\Scripts\python.exe teste_agentes.py
+
 # Conexão ao WhatsApp e resposta de confirmação às mensagens recebidas
 .\.venv\Scripts\python.exe teste_whatsapp.py
 ```
+
+O `teste_agentes.py` usa `.env.extensao` e mostra o plano, os resultados (limitados a 3.000 caracteres na exibição) e a resposta final, sem se conectar ao WhatsApp. As fontes necessárias dependem da pergunta: Ollama para planejamento e resposta, índice e embeddings para RAG, e chave OMDb para filmes.
 
 O teste de WhatsApp usa a mesma sessão dos bots e deve ser executado separadamente. O teste de RAG mostra os trechos recuperados, sem gerar uma resposta de conversação.
 
