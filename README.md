@@ -2,7 +2,7 @@
 
 Projeto didático da Aula 07 de Inteligência Artificial: um assistente em Python integrado ao WhatsApp, com geração de respostas por modelos locais no Ollama, consulta a documentos PDF com RAG e pesquisa de filmes e séries pela API OMDb.
 
-O repositório apresenta três versões do assistente: conversação básica, consultas por comandos e uma versão com dois agentes que seleciona ferramentas a partir de perguntas em linguagem natural.
+O repositório apresenta três versões do assistente: conversação básica, consultas por comandos e uma versão com dois agentes que pesquisa em rodadas e seleciona ferramentas a partir de perguntas em linguagem natural.
 
 ## Funcionalidades
 
@@ -12,8 +12,8 @@ O repositório apresenta três versões do assistente: conversação básica, co
 - Recuperação de trechos por similaridade de cosseno, sem banco vetorial externo.
 - Respostas sobre documentos acompanhadas dos nomes dos arquivos e das páginas recuperadas.
 - Consulta de detalhes e pesquisa de títulos na OMDb.
-- Planejamento em JSON, execução de ferramentas e análise dos resultados na versão com agentes.
-- Comandos de ajuda, menu e limpeza do histórico; inspeção do último plano com `/plano` na versão com agentes.
+- Planejamento em JSON, pesquisa em várias rodadas, execução de ferramentas e análise das evidências na versão com agentes.
+- Comandos de ajuda, menu e limpeza do histórico; inspeção da última pesquisa com `/plano` na versão com agentes.
 - Filtro para ignorar mensagens próprias, grupos, status e mensagens sem texto.
 
 ## Versões do bot
@@ -22,7 +22,7 @@ O repositório apresenta três versões do assistente: conversação básica, co
 | --- | --- | --- |
 | `bot.py` | Assistente básico com Ollama e memória por conversa | Envie uma pergunta diretamente |
 | `bot_rag_omdb.py` | Assistente com IA, documentos e OMDb | Use os comandos `/ia`, `/rag`, `/filme` e `/buscarfilme` |
-| `bot_agentes.py` | Planejador e analista com seleção automática de ferramentas | Envie perguntas em linguagem natural; use `/plano` para consultar a última decisão |
+| `bot_agentes.py` | Planejador e analista com seleção automática de ferramentas | Envie perguntas em linguagem natural; use `/plano` para consultar a última pesquisa |
 
 Execute apenas uma versão por vez: os bots compartilham o arquivo de sessão do WhatsApp.
 
@@ -47,9 +47,11 @@ Os modelos padrão configurados no código são `qwen2.5:3b` para conversação 
 ├── bot.py                    # Bot básico: WhatsApp + Ollama
 ├── bot_rag_omdb.py            # Bot com comandos de IA, RAG e OMDb
 ├── bot_agentes.py            # WhatsApp com planejador, ferramentas e analista
-├── agente_planejador.py      # Seleção de ferramentas e plano JSON
-├── motor_ferramentas.py      # Execução de consultas e resposta final
-├── teste_agentes.py          # Fluxo dos dois agentes no terminal
+├── agentes_autonomos.py      # Pesquisa iterativa e resposta com evidências
+├── teste_autonomos.py        # Fluxo atual dos agentes no terminal
+├── agente_planejador.py      # Planejador do fluxo anterior, mantido para estudo
+├── motor_ferramentas.py      # Ferramentas e analista do fluxo anterior
+├── teste_agentes.py          # Demonstração do fluxo anterior no terminal
 ├── ollama_client.py           # Cliente da API de conversação
 ├── omdb_client.py             # Consulta, busca e formatação de títulos
 ├── rag_local.py               # Extração, indexação e busca vetorial
@@ -178,7 +180,7 @@ Envie perguntas como:
 - `Pesquise cinco filmes com Batman no título.`
 - `Relacione inteligência artificial nos documentos com o filme Ex Machina.`
 
-A seleção da fonte depende do plano produzido pelo modelo. Use `/plano` após uma resposta para consultar o plano armazenado.
+A seleção da fonte depende do plano produzido pelo modelo. Use `/plano` após uma resposta para consultar a pesquisa armazenada, com categoria, evidências e quantidade de consultas. A exibição do JSON é limitada a 3.500 caracteres e pode aparecer incompleta.
 
 Na primeira conexão, siga o pareamento apresentado pelo Neonize, usando a opção de aparelhos conectados do WhatsApp. Após a conexão, envie uma mensagem de outra conta para o número conectado: mensagens enviadas pela própria conta são ignoradas.
 
@@ -192,7 +194,7 @@ Para encerrar o processo, pressione `Ctrl+C` no terminal.
 | `/ajuda` | Mostra instruções e exemplos | Todas as versões |
 | `/sobre` | Apresenta o assistente | Todas as versões |
 | `/limpar` | Remove o histórico; na versão com agentes também remove o plano e os resultados armazenados | Todas as versões |
-| `/plano` | Mostra o último plano JSON armazenado na conversa | Bot com agentes |
+| `/plano` | Mostra o resumo JSON da última pesquisa, limitado a 3.500 caracteres | Bot com agentes |
 | `/ia Explique aprendizado de máquina` | Conversa com o modelo local | Bot estendido |
 | `/rag O que é a taxonomia de Bloom?` | Consulta os PDFs indexados | Bot estendido |
 | `/documentos` | Lista arquivos e quantidade de páginas indexadas | Bot estendido |
@@ -215,31 +217,43 @@ Execute novamente `indexar_pdfs.py` após adicionar, remover ou alterar PDFs, ou
 
 ## Como funcionam os dois agentes
 
+O fluxo atual de `bot_agentes.py` usa `agentes_autonomos.py`. O primeiro agente decide se deve pesquisar novamente com base nas evidências coletadas; o segundo produz a resposta final.
+
 ```mermaid
 flowchart TD
-    U["Pergunta no WhatsApp ou terminal"] --> P["Agente 1: planeja consultas em JSON"]
-    P --> F["Python: executa ferramentas em sequência"]
-    F --> R["Resultados: PDFs, OMDb, contexto ou conversa geral"]
-    R --> A["Agente 2: interpreta os resultados"]
-    A --> S["Resposta ao usuário"]
+    U["Pergunta e histórico"] --> P["IA 1: decide a próxima rodada"]
+    P --> D{"Finalizar ou atingir limites?"}
+    D -->|Não| F["Python executa até duas ações"]
+    F --> E["Acumula evidências e IMDb IDs"]
+    E --> P
+    D -->|Sim| A["IA 2: interpreta as evidências"]
+    A --> R["Resposta no WhatsApp ou terminal"]
 ```
 
-O `agente_planejador.py` solicita um plano com até quatro ações. Cada ação contém `ferramenta`, `consulta`, `limite`, `ano` e `detalhar`. O código filtra ferramentas desconhecidas e restringe o limite de resultados ao intervalo de 1 a 5. O plano também informa a categoria: `geral`, `rag`, `filmes` ou `mista`. Perguntas gerais usam `direto`; nas categorias `rag` e `filmes`, o código filtra ferramentas de outras fontes. Sem ações válidas, a categoria `rag` usa uma busca padrão, `filmes` retorna um plano vazio com erro, e as demais usam `direto`.
+O planejador recebe pergunta, até seis mensagens do histórico, evidências da pesquisa atual, número da rodada e consultas restantes. Sua decisão JSON contém `categoria` (`geral`, `rag`, `filmes` ou `mista`), `finalizar`, `justificativa` e `acoes`.
 
-| Ferramenta | Finalidade |
+| Ferramenta atual | Finalidade |
 | --- | --- |
-| `direto` | Responder perguntas gerais com o conhecimento do modelo, sem consultar fontes externas |
-| `rag_lista` | Listar os documentos presentes no índice |
-| `rag_busca` | Recuperar trechos dos PDFs por similaridade vetorial |
-| `omdb_titulo` | Identificar uma obra e consultar seus detalhes |
-| `omdb_busca` | Pesquisar títulos na primeira página da OMDb e, opcionalmente, consultar seus detalhes |
-| `contexto_anterior` | Reutilizar resultados armazenados da consulta anterior |
+| `rag_lista` | Listar os documentos indexados |
+| `rag_busca` | Buscar trechos nos PDFs; retorna até 1.000 caracteres por trecho |
+| `omdb_busca` | Pesquisar candidatos por palavras do título, com ano opcional, na primeira página da OMDb |
+| `omdb_detalhes` | Consultar detalhes pelo IMDb ID encontrado durante a pesquisa atual |
 
-O `motor_ferramentas.py` executa as ações em sequência e registra erros por ação nos resultados. Quando há resultados de ferramentas, o analista recebe esses dados para gerar a resposta em português. Se todas as ações forem `direto`, a resposta usa `consultar_ollama`, com o prompt de conversação geral e o histórico disponível. Se a lista de resultados estiver vazia, o motor retorna uma mensagem solicitando mais detalhes, sem fazer uma nova chamada ao modelo. As instruções orientam o modelo a citar arquivos e páginas nas respostas RAG e informar falhas ou ambiguidades nas consultas.
+O código limita cada pesquisa a **cinco rodadas**, **duas ações por rodada** e **oito registros de consulta**, incluindo erros registrados. O limite de resultados por ação fica entre 1 e 5. As constantes `MAX_RODADAS` e `MAX_CONSULTAS` estão em `agentes_autonomos.py`.
 
-O `bot_agentes.py` mantém histórico, último plano e últimos resultados separados por conversa, apenas em memória. Armazena até 12 mensagens, equivalentes a seis interações; o planejador e o analista de ferramentas recebem até as seis mensagens mais recentes desse histórico. Na rota exclusivamente `direto`, o cliente de conversação recebe todo o histórico disponível, de até 12 mensagens. `/limpar` remove todo esse estado.
+Consultas repetidas são identificadas por ferramenta, texto em minúsculas e ano e não são executadas novamente na mesma pesquisa. Alterar apenas `limite` não cria uma consulta diferente. O ciclo também termina quando a IA pede para finalizar, não retorna ações ou nenhuma ação é executada na rodada.
 
-Na versão por comandos, a recuperação RAG usa três trechos e o bot acrescenta as referências à resposta. Na versão com agentes, a quantidade depende do plano, e a citação é solicitada nas instruções do analista.
+Para filmes, o planejador pode buscar candidatos, conferir os resultados e solicitar detalhes em uma rodada posterior. O controlador bloqueia detalhes de IMDb IDs que não tenham aparecido entre os candidatos da pesquisa atual. O fluxo atual não usa a tabela fixa de títulos nem a pontuação heurística de `motor_ferramentas.py`: a escolha entre candidatos depende do modelo.
+
+Perguntas gerais são orientadas a finalizar sem ferramentas. A resposta final passa por `responder_com_ia`, inclusive quando não há evidências; as instruções pedem conhecimento geral para essa categoria e explicação de limitações quando os dados forem insuficientes.
+
+O bot armazena até 12 mensagens de histórico por conversa, além da última pesquisa e suas evidências, apenas em memória. Os dois agentes recebem até seis mensagens desse histórico. Cada pergunta começa uma nova coleta de evidências e de IMDb IDs; os resultados anteriores ficam disponíveis para inspeção por `/plano`, mas não são automaticamente reinjetados como evidências na pesquisa seguinte. `/limpar` remove todo o estado da conversa.
+
+### Fluxo anterior para estudo
+
+`agente_planejador.py`, `motor_ferramentas.py` e `teste_agentes.py` continuam disponíveis para demonstrar o planejamento de um único plano com até quatro ações. Esse fluxo possui ferramentas como `direto`, `omdb_titulo` e `contexto_anterior`, mas não é mais o fluxo usado por `bot_agentes.py`.
+
+Na versão por comandos, o RAG usa três trechos e o bot acrescenta referências à resposta. Nos fluxos com agentes, a quantidade depende das ações, e a citação é solicitada nas instruções do analista.
 
 ## Verificações manuais
 
