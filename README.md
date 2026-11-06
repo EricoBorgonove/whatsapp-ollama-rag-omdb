@@ -2,17 +2,18 @@
 
 Projeto didático da Aula 07 de Inteligência Artificial: um assistente em Python integrado ao WhatsApp, com geração de respostas por modelos locais no Ollama, consulta a documentos PDF com RAG e pesquisa de filmes e séries pela API OMDb.
 
-O repositório apresenta duas versões do assistente, permitindo explorar a evolução de uma conversa com IA para um bot que consulta documentos e serviços externos.
+O repositório apresenta três versões do assistente: conversação básica, consultas por comandos e uma versão com dois agentes que seleciona ferramentas a partir de perguntas em linguagem natural.
 
 ## Funcionalidades
 
 - Conversação em português com um modelo executado pelo Ollama.
-- Histórico separado por conversa, limitado às últimas dez interações.
+- Histórico separado por conversa: até dez interações nos bots básico e por comandos; até seis na versão com agentes.
 - Extração de texto de PDFs e geração local de embeddings.
 - Recuperação de trechos por similaridade de cosseno, sem banco vetorial externo.
 - Respostas sobre documentos acompanhadas dos nomes dos arquivos e das páginas recuperadas.
 - Consulta de detalhes e pesquisa de títulos na OMDb.
-- Comandos de ajuda, menu e limpeza do histórico.
+- Planejamento em JSON, execução de ferramentas e análise dos resultados na versão com agentes.
+- Comandos de ajuda, menu e limpeza do histórico; inspeção do último plano com `/plano` na versão com agentes.
 - Filtro para ignorar mensagens próprias, grupos, status e mensagens sem texto.
 
 ## Versões do bot
@@ -21,6 +22,7 @@ O repositório apresenta duas versões do assistente, permitindo explorar a evol
 | --- | --- | --- |
 | `bot.py` | Assistente básico com Ollama e memória por conversa | Envie uma pergunta diretamente |
 | `bot_rag_omdb.py` | Assistente com IA, documentos e OMDb | Use os comandos `/ia`, `/rag`, `/filme` e `/buscarfilme` |
+| `bot_agentes.py` | Planejador e analista com seleção automática de ferramentas | Envie perguntas em linguagem natural; use `/plano` para consultar a última decisão |
 
 Execute apenas uma versão por vez: os bots compartilham o arquivo de sessão do WhatsApp.
 
@@ -44,6 +46,10 @@ Os modelos padrão configurados no código são `qwen2.5:3b` para conversação 
 .
 ├── bot.py                    # Bot básico: WhatsApp + Ollama
 ├── bot_rag_omdb.py            # Bot com comandos de IA, RAG e OMDb
+├── bot_agentes.py            # WhatsApp com planejador, ferramentas e analista
+├── agente_planejador.py      # Seleção de ferramentas e plano JSON
+├── motor_ferramentas.py      # Execução de consultas e resposta final
+├── teste_agentes.py          # Fluxo dos dois agentes no terminal
 ├── ollama_client.py           # Cliente da API de conversação
 ├── omdb_client.py             # Consulta, busca e formatação de títulos
 ├── rag_local.py               # Extração, indexação e busca vetorial
