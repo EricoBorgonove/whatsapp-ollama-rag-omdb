@@ -213,6 +213,34 @@ No bot básico, envie texto livre para conversar. No bot por comandos, perguntas
 
 Execute novamente `indexar_pdfs.py` após adicionar, remover ou alterar PDFs, ou trocar o modelo de embeddings. A indexação reconstrói e substitui o índice anterior.
 
+## Como funcionam os dois agentes
+
+```mermaid
+flowchart TD
+    U["Pergunta no WhatsApp ou terminal"] --> P["Agente 1: planeja consultas em JSON"]
+    P --> F["Python: executa ferramentas em sequência"]
+    F --> R["Resultados: PDFs, OMDb, contexto ou conversa geral"]
+    R --> A["Agente 2: interpreta os resultados"]
+    A --> S["Resposta ao usuário"]
+```
+
+O `agente_planejador.py` solicita um plano com até quatro ações. Cada ação contém `ferramenta`, `consulta`, `limite`, `ano` e `detalhar`. O código filtra ferramentas desconhecidas e restringe o limite de resultados ao intervalo de 1 a 5. Se nenhuma ação válida restar, usa `direto`.
+
+| Ferramenta | Finalidade |
+| --- | --- |
+| `direto` | Responder perguntas gerais com o conhecimento do modelo, sem consultar fontes externas |
+| `rag_lista` | Listar os documentos presentes no índice |
+| `rag_busca` | Recuperar trechos dos PDFs por similaridade vetorial |
+| `omdb_titulo` | Identificar uma obra e consultar seus detalhes |
+| `omdb_busca` | Pesquisar títulos na primeira página da OMDb e, opcionalmente, consultar seus detalhes |
+| `contexto_anterior` | Reutilizar resultados armazenados da consulta anterior |
+
+O `motor_ferramentas.py` executa as ações em sequência e registra erros por ação nos resultados. O analista recebe esses resultados para gerar a resposta em português. As instruções orientam o modelo a citar arquivos e páginas nas respostas RAG e informar falhas ou ambiguidades nas consultas.
+
+O `bot_agentes.py` mantém histórico, último plano e últimos resultados separados por conversa, apenas em memória. Armazena até 12 mensagens, equivalentes a seis interações; o planejador e o analista recebem até as seis mensagens mais recentes desse histórico. `/limpar` remove todo esse estado.
+
+Na versão por comandos, a recuperação RAG usa três trechos e o bot acrescenta as referências à resposta. Na versão com agentes, a quantidade depende do plano, e a citação é solicitada nas instruções do analista.
+
 ## Verificações manuais
 
 Estes scripts são demonstrações de integração, não uma suíte automatizada de testes:
