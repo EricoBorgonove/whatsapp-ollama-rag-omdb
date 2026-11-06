@@ -118,7 +118,7 @@ OLLAMA_URL=http://localhost:11434
 OLLAMA_MODEL=qwen2.5:3b
 ```
 
-### Bot com RAG e OMDb
+### Bots com RAG, OMDb e agentes
 
 Crie um arquivo chamado `.env.extensao` na raiz do projeto:
 
@@ -131,7 +131,7 @@ OMDB_API_KEY=COLOQUE_SUA_CHAVE_AQUI
 
 Substitua o valor de `OMDB_API_KEY` pela sua chave. Ela é necessária apenas para as consultas à OMDb. Use em `OLLAMA_URL` a URL base do serviço, sem acrescentar `/api/chat` ou `/api/embed`.
 
-O bot estendido carrega `.env.extensao` com prioridade sobre variáveis já existentes no ambiente. Os scripts independentes de RAG carregam esse arquivo sem sobrescrever variáveis do ambiente.
+O bot por comandos e os módulos de agentes carregam `.env.extensao` com prioridade sobre variáveis já existentes no ambiente. Os scripts independentes de RAG carregam esse arquivo sem sobrescrever variáveis do ambiente.
 
 ## Execução
 
@@ -158,6 +158,27 @@ Execute os comandos na raiz do projeto, pois os caminhos de configuração, docu
    ```powershell
    .\.venv\Scripts\python.exe bot_rag_omdb.py
    ```
+
+### Assistente com dois agentes
+
+Use a mesma configuração `.env.extensao` do bot com RAG e OMDb. Prepare os PDFs e gere o índice para consultar documentos; configure a chave OMDb para as perguntas sobre filmes.
+
+```powershell
+.\.venv\Scripts\python.exe bot_agentes.py
+```
+
+Os papéis de planejador e analista usam o mesmo modelo definido em `OLLAMA_MODEL`, em chamadas separadas. O serviço Ollama deve aceitar o esquema JSON enviado no campo `format` para o planejamento.
+
+Envie perguntas como:
+
+- `Quais documentos estão indexados?`
+- `O que os artigos falam sobre RAG?`
+- `Quem dirigiu o filme Interestelar?`
+- `Compare os filmes Matrix e Interestelar.`
+- `Pesquise cinco filmes com Batman no título.`
+- `Relacione inteligência artificial nos documentos com o filme Ex Machina.`
+
+A seleção da fonte depende do plano produzido pelo modelo. Use `/plano` após uma resposta para consultar o plano armazenado.
 
 Na primeira conexão, siga o pareamento apresentado pelo Neonize, usando a opção de aparelhos conectados do WhatsApp. Após a conexão, envie uma mensagem de outra conta para o número conectado: mensagens enviadas pela própria conta são ignoradas.
 
