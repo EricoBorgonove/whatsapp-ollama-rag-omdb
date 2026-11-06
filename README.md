@@ -266,20 +266,25 @@ Estes scripts são demonstrações de integração, não uma suíte automatizada
 # Recuperação de trechos; exige Ollama e índice disponível
 .\.venv\Scripts\python.exe teste_rag.py
 
-# Fluxo de planejamento, ferramentas e resposta no terminal; digite sair para encerrar
+# Fluxo atual de pesquisa iterativa; digite sair para encerrar
+.\.venv\Scripts\python.exe teste_autonomos.py
+
+# Fluxo anterior de planejamento e ferramentas; digite sair para encerrar
 .\.venv\Scripts\python.exe teste_agentes.py
 
 # Conexão ao WhatsApp e resposta de confirmação às mensagens recebidas
 .\.venv\Scripts\python.exe teste_whatsapp.py
 ```
 
-O `teste_agentes.py` usa `.env.extensao` e mostra o plano, os resultados (limitados a 3.000 caracteres na exibição) e a resposta final, sem se conectar ao WhatsApp. As fontes necessárias dependem da pergunta: Ollama para planejamento e resposta, índice e embeddings para RAG, e chave OMDb para filmes.
+O `teste_autonomos.py` demonstra o fluxo atual sem WhatsApp: mostra a pesquisa (limitada a 5.000 caracteres na exibição) e a resposta final. O `teste_agentes.py` demonstra o fluxo anterior, mostrando plano, resultados (até 3.000 caracteres) e resposta. Ambos usam `.env.extensao`. As fontes necessárias dependem da pergunta: Ollama para planejamento e resposta, índice e embeddings para RAG, e chave OMDb para filmes.
 
 O teste de WhatsApp usa a mesma sessão dos bots e deve ser executado separadamente. O teste de RAG mostra os trechos recuperados, sem gerar uma resposta de conversação.
 
-## Identificação de filmes na versão com agentes
+## Identificação de filmes no fluxo anterior
 
-O motor normaliza títulos e inclui cinco correspondências didáticas: `Interestelar` → `Interstellar` (2014), `A Origem` → `Inception` (2010), `Matrix` → `The Matrix` (1999), `O Cavaleiro das Trevas` → `The Dark Knight` (2008) e `Oppenheimer` → `Oppenheimer` (2023). Outros títulos dependem das consultas à OMDb e do planejamento do modelo.
+Esta seção descreve `motor_ferramentas.py`, utilizado por `teste_agentes.py`. O bot atual usa a pesquisa iterativa descrita acima.
+
+O motor anterior normaliza títulos e inclui cinco correspondências didáticas: `Interestelar` → `Interstellar` (2014), `A Origem` → `Inception` (2010), `Matrix` → `The Matrix` (1999), `O Cavaleiro das Trevas` → `The Dark Knight` (2008) e `Oppenheimer` → `Oppenheimer` (2023). Outros títulos dependem das consultas à OMDb e do planejamento do modelo.
 
 A identificação consulta por título e também realiza uma busca mais ampla, mesmo quando a primeira consulta encontra candidatos. Os resultados são reunidos pelo IMDb ID, preservando os dados da consulta direta quando a busca retorna a mesma obra. Os candidatos são comparados pelo título normalizado e pelos filtros de ano e tipo quando informados. Títulos vazios recebem pontuação zero. O código exige pontuação de pelo menos 0,92 e sinaliza ambiguidade quando os dois melhores candidatos aceitos têm diferença inferior a 0,03. Esses valores são heurísticas de comparação, não probabilidades de acerto.
 
@@ -292,8 +297,10 @@ Quando uma obra é selecionada, seus detalhes são consultados pelo IMDb ID reto
 - A busca RAG retorna os trechos mais semelhantes sem aplicar um limiar mínimo de relevância. As referências exibidas indicam os trechos recuperados e não garantem que toda afirmação da resposta esteja sustentada por eles.
 - O índice JSON é carregado e percorrido a cada busca, uma abordagem simples para fins didáticos e bases pequenas.
 - O bloqueio usado na conversação com histórico permanece ativo durante a consulta ao Ollama. No bot com agentes, ele abrange planejamento, ferramentas e análise, serializando o processamento entre conversas.
-- A versão com agentes normalmente realiza duas chamadas ao modelo por pergunta: planejamento e resposta, além das consultas às ferramentas. Se não houver resultados para analisar, retorna uma orientação local após o planejamento, sem a segunda chamada. A busca adicional de candidatos pode aumentar o número de requisições à OMDb.
-- A seleção das ferramentas e a redação final dependem do modelo; os limites do plano e a validação de títulos não garantem respostas corretas.
+- O fluxo atual pode realizar até cinco chamadas de planejamento e uma chamada para a resposta final, além das consultas às ferramentas. O número de rodadas e o tamanho das evidências aumentam o tempo de resposta e o contexto enviado ao modelo.
+- Os limites de pesquisa evitam um ciclo indefinido, mas podem encerrar a coleta antes de obter dados suficientes. A quantidade de consultas exibida inclui registros de erro e não corresponde necessariamente ao número de requisições HTTP.
+- A pesquisa atual valida a origem dos IMDb IDs antes de solicitar detalhes, mas a escolha da obra ainda depende do modelo. As heurísticas do fluxo anterior não se aplicam a essa seleção.
+- A seleção das ferramentas e a redação final dependem do modelo; os limites de pesquisa e o controle de IMDb IDs não garantem respostas corretas.
 - O planejamento exige suporte ao formato estruturado do Ollama e do modelo. Um JSON inválido pode interromper o processamento da pergunta.
 - As dependências não têm versões fixadas em `requirements.txt`.
 - Os bots imprimem identificadores de conversa e textos recebidos no terminal.
@@ -308,7 +315,7 @@ Quando uma obra é selecionada, seus detalhes são consultados pelo IMDb ID reto
 | Nenhum texto extraído | Verifique se os PDFs têm texto selecionável |
 | Falha nas consultas de filmes | Chave OMDb configurada, conexão com a internet e título pesquisado |
 | Falha no planejamento dos agentes | Confira o serviço Ollama, o modelo e o suporte ao esquema JSON; consulte o erro no terminal |
-| Filme ambíguo na versão com agentes | Informe o título original e o ano para ajudar a identificação |
+| Pesquisa terminou com dados insuficientes | Informe o título original, ano ou termos mais específicos; a coleta pode ter atingido os limites de rodadas e consultas |
 | Bot não responde | Confira a conexão, use outra conta e envie uma mensagem privada com texto; no bot estendido, use um comando válido |
 
 ## Publicação no GitHub
