@@ -4,6 +4,10 @@ import threading
 
 from dotenv import load_dotenv
 
+# ==========================================
+# CONFIGURACOES DA EXTENSAO
+# ==========================================
+
 load_dotenv(".env.extensao", override=True)
 
 from neonize.client import NewClient
@@ -14,29 +18,32 @@ from neonize.events import (
 )
 from neonize import extract_text
 
-from agente_planejador import planejar
-
-from motor_ferramentas import (
-    executar_plano,
-    analisar_resultados
+from agentes_autonomos import (
+    pesquisar_com_ia,
+    responder_com_ia
 )
 
 
 # ==========================================
-# CONFIGURACOES
+# CONFIGURACOES GERAIS
 # ==========================================
 
-cliente = NewClient("sessao_whatsapp.db")
+SESSAO_WHATSAPP = "sessao_whatsapp.db"
 
+cliente = NewClient(SESSAO_WHATSAPP)
+
+# Estado da conexao
 conectado_evento = threading.Event()
+
+# Controle de acesso as conversas
 bloqueio = threading.RLock()
 
-# Dados separados por conversa
+# Historico e resultados por conversa
 conversas = {}
 
 
 # ==========================================
-# CONTROLE DE CONVERSAS
+# GERENCIAMENTO DE CONVERSAS
 # ==========================================
 
 def obter_conversa(identificador):
@@ -53,142 +60,167 @@ def obter_conversa(identificador):
 
 
 # ==========================================
-# COMANDOS
+# GERAR MENU
 # ==========================================
 
 def gerar_menu():
 
     return (
         "🤖 *ASSISTENTE INTELIGENTE*\n\n"
-        "Envie sua pergunta normalmente.\n\n"
 
-        "Posso:\n"
-        "📚 Consultar documentos PDF\n"
-        "🎬 Pesquisar filmes e séries\n"
-        "🔎 Comparar informações\n"
-        "🤖 Responder perguntas gerais\n\n"
+        "Envie sua pergunta normalmente.\n"
+        "Os agentes selecionam automaticamente "
+        "as fontes de informação.\n\n"
 
-        "*Comandos:*\n"
+        "📚 *Documentos PDF*\n"
+        "Consultas aos arquivos indexados "
+        "utilizando RAG.\n\n"
+
+        "🎬 *Filmes e séries*\n"
+        "Pesquisas na API OMDb.\n\n"
+
+        "🧠 *Conhecimento geral*\n"
+        "Perguntas respondidas pelo Ollama.\n\n"
+
+        "🔎 *Consultas combinadas*\n"
+        "Relacionamento entre documentos "
+        "e informações de filmes.\n\n"
+
+        "⚙️ *COMANDOS*\n"
         "/menu - Exibir menu\n"
         "/ajuda - Exemplos de perguntas\n"
-        "/sobre - Informações do projeto\n"
-        "/plano - Mostrar a última decisão da IA\n"
-        "/limpar - Limpar o histórico"
+        "/sobre - Informações do assistente\n"
+        "/plano - Mostrar a última pesquisa\n"
+        "/limpar - Reiniciar a conversa"
     )
 
+
+# ==========================================
+# GERAR AJUDA
+# ==========================================
 
 def gerar_ajuda():
 
     return (
-        "❓ *EXEMPLOS DE PERGUNTAS*\n\n"
+        "❓ *COMO UTILIZAR O ASSISTENTE*\n\n"
 
-        "1. Quais documentos estão indexados?\n\n"
+        "Não é necessário escolher "
+        "uma ferramenta manualmente.\n\n"
 
-        "2. O que os artigos falam sobre RAG?\n\n"
+        "📚 *Documentos:*\n"
+        "Quais artigos estão indexados?\n"
+        "O que os PDFs dizem sobre RAG?\n\n"
 
-        "3. Quem dirigiu Interestelar?\n\n"
+        "🎬 *Filmes:*\n"
+        "Quem dirigiu Interestelar?\n"
+        "Compare Matrix e Interestelar.\n"
+        "Pesquise filmes com Batman no título.\n\n"
 
-        "4. Compare Matrix e Interestelar.\n\n"
+        "🧠 *Conhecimento geral:*\n"
+        "Explique o que é Python.\n"
+        "O que é Inteligência Artificial?\n\n"
 
-        "5. Pesquise cinco filmes com Batman "
-        "no título.\n\n"
+        "🔎 *Consulta combinada:*\n"
+        "Relacione a inteligência artificial "
+        "dos meus PDFs com o filme Ex Machina.\n\n"
 
-        "6. Relacione inteligência artificial "
-        "nos documentos com o filme Ex Machina.\n\n"
-
-        "Não é necessário selecionar "
-        "a fonte manualmente."
+        "⚙️ *Outros comandos:*\n"
+        "/plano - Ver as decisões da IA\n"
+        "/limpar - Limpar o histórico."
     )
 
+
+# ==========================================
+# GERAR SOBRE
+# ==========================================
 
 def gerar_sobre():
 
     return (
         "ℹ️ *SOBRE O ASSISTENTE*\n\n"
 
-        "Chatbot desenvolvido em Python, "
-        "integrado ao WhatsApp e Ollama.\n\n"
+        "🤖 *Chatbot com Agentes de IA*\n\n"
 
-        "Utiliza dois agentes de IA:\n\n"
+        "Assistente virtual desenvolvido "
+        "em Python e integrado ao WhatsApp "
+        "e ao Ollama.\n\n"
 
-        "🧠 Agente 1: planeja as consultas "
-        "e seleciona as ferramentas.\n\n"
+        "🧠 *IA 1 - Planejador*\n"
+        "Interpreta perguntas, seleciona "
+        "ferramentas e realiza pesquisas.\n\n"
 
-        "🤖 Agente 2: interpreta os dados "
-        "recuperados e gera a resposta.\n\n"
+        "🤖 *IA 2 - Analista*\n"
+        "Interpreta os resultados e "
+        "produz as respostas finais.\n\n"
 
-        "Fontes disponíveis:\n"
-        "📚 Documentos PDF com RAG\n"
-        "🎬 API OMDb\n"
-        "💬 Modelo local Ollama"
+        "📚 *Fontes disponíveis:*\n"
+        "• Conhecimento geral do Ollama\n"
+        "• Documentos PDF com RAG\n"
+        "• API de filmes OMDb\n\n"
+
+        "🛠️ *Tecnologias:*\n"
+        "Python, Neonize, Ollama, "
+        "RAG e API REST."
     )
 
 
 # ==========================================
-# EXECUTAR OS DOIS AGENTES
+# PROCESSAR PERGUNTA COM DOIS AGENTES
 # ==========================================
 
 def processar_pergunta(pergunta, identificador):
 
-    # Nesta versao didatica, o bloqueio
-    # tambem serializa o processamento.
     with bloqueio:
 
-        conversa = obter_conversa(identificador)
+        conversa = obter_conversa(
+            identificador
+        )
 
         historico = conversa["historico"]
 
         # ==================================
-        # IA 1 - PLANEJADOR
+        # IA 1 - PLANEJAR E PESQUISAR
         # ==================================
 
         print(
-            "\n[IA 1] Analisando pergunta...",
+            "\n[IA 1] Iniciando planejamento...",
             flush=True
         )
 
-        plano = planejar(
+        pesquisa = pesquisar_com_ia(
             pergunta,
             historico
         )
 
         print(
-            "[IA 1] Plano:",
-            json.dumps(
-                plano,
-                ensure_ascii=False,
-                indent=2
-            ),
+            "\n[IA 1] Pesquisa concluida.",
+            flush=True
+        )
+
+        print(
+            "Categoria:",
+            pesquisa["categoria"],
+            flush=True
+        )
+
+        print(
+            "Consultas realizadas:",
+            pesquisa["consultas"],
             flush=True
         )
 
         # ==================================
-        # EXECUTAR FERRAMENTAS
+        # IA 2 - ANALISAR E RESPONDER
         # ==================================
 
         print(
-            "\n[FERRAMENTAS] Executando...",
+            "\n[IA 2] Gerando resposta...",
             flush=True
         )
 
-        resultados = executar_plano(
-            plano,
+        resposta = responder_com_ia(
             pergunta,
-            conversa["resultados"]
-        )
-
-        # ==================================
-        # IA 2 - ANALISTA
-        # ==================================
-
-        print(
-            "\n[IA 2] Interpretando resultados...",
-            flush=True
-        )
-
-        resposta = analisar_resultados(
-            pergunta,
-            resultados,
+            pesquisa,
             historico
         )
 
@@ -209,14 +241,24 @@ def processar_pergunta(pergunta, identificador):
             ]
         )[-12:]
 
-        conversa["plano"] = plano
-        conversa["resultados"] = resultados
+        # Registrar a ultima pesquisa
+        conversa["plano"] = pesquisa
+
+        conversa["resultados"] = (
+            pesquisa["evidencias"]
+        )
+
+        print(
+            "\n[IA 2] Resposta final:",
+            resposta,
+            flush=True
+        )
 
         return resposta
 
 
 # ==========================================
-# EVENTO DE CONEXAO
+# EVENTO: CONEXAO WHATSAPP
 # ==========================================
 
 @cliente.event(ConnectedEv)
@@ -224,13 +266,24 @@ def conectado(client, evento):
 
     conectado_evento.set()
 
-    print("\n✅ WhatsApp conectado!", flush=True)
-    print("Dois agentes de IA disponíveis.")
-    print("Aguardando perguntas...\n")
+    print(
+        "\n✅ WhatsApp conectado!",
+        flush=True
+    )
+
+    print(
+        "🤖 Dois agentes de IA disponíveis.",
+        flush=True
+    )
+
+    print(
+        "📨 Aguardando perguntas...\n",
+        flush=True
+    )
 
 
 # ==========================================
-# EVENTO DE DESCONEXAO
+# EVENTO: DESCONEXAO WHATSAPP
 # ==========================================
 
 @cliente.event(DisconnectedEv)
@@ -243,55 +296,83 @@ def desconectado(client, evento):
         flush=True
     )
 
+    print(
+        "Aguardando reconexão...",
+        flush=True
+    )
+
 
 # ==========================================
-# ENVIAR RESPOSTA
+# ENVIAR RESPOSTA PELO WHATSAPP
 # ==========================================
 
 def enviar_resposta(client, evento, texto):
 
+    # Verificar conexao
     if not conectado_evento.is_set():
 
         print(
-            "Aguardando reconexao...",
+            "WhatsApp desconectado. "
+            "Aguardando reconexão...",
             flush=True
         )
 
-        conectado_evento.wait(timeout=30)
+        conectado_evento.wait(
+            timeout=30
+        )
 
     if not conectado_evento.is_set():
 
         print(
-            "WhatsApp indisponivel. "
-            "Resposta nao enviada.",
+            "Resposta não enviada: "
+            "WhatsApp indisponível.",
             flush=True
         )
 
-        return
+        return False
 
     try:
 
-        client.reply_message(texto, evento)
-
         print(
-            "\n✅ Resposta enviada!",
+            "\n📤 Enviando resposta...",
             flush=True
         )
+
+        client.reply_message(
+            texto,
+            evento
+        )
+
+        print(
+            "✅ Resposta enviada!",
+            flush=True
+        )
+
+        return True
 
     except Exception as erro:
 
         print(
-            "Erro ao enviar resposta:",
+            "❌ Erro ao enviar resposta:",
             repr(erro),
             flush=True
         )
 
         if "client is nil" in str(erro).lower():
+
             conectado_evento.clear()
+
+            print(
+                "Cliente WhatsApp indisponível. "
+                "Aguardando reconexão.",
+                flush=True
+            )
+
+        return False
 
 
 # ==========================================
-# EVENTO DE MENSAGEM
+# EVENTO: NOVA MENSAGEM
 # ==========================================
 
 @cliente.event(MessageEv)
@@ -299,52 +380,85 @@ def mensagem(client, evento):
 
     try:
 
+        # ----------------------------------
+        # EXTRAIR MENSAGEM
+        # ----------------------------------
+
         origem = evento.Info.MessageSource
 
         texto = (
             extract_text(evento.Message) or ""
         ).strip()
 
+        # Ignorar mensagens proprias
         if origem.IsFromMe:
             return
 
+        # Ignorar grupos e status
         if origem.Chat.Server in (
-            "g.us", "broadcast"
+            "g.us",
+            "broadcast"
         ):
             return
 
+        # Ignorar mensagens vazias
         if not texto:
             return
+
+        # ----------------------------------
+        # IDENTIFICAR CONVERSA
+        # ----------------------------------
 
         identificador = (
             f"{origem.Chat.User}"
             f"@{origem.Chat.Server}"
         )
 
-        print("\n========== NOVA PERGUNTA ==========")
-        print("Conversa:", identificador)
-        print("Pergunta:", texto)
+        print(
+            "\n========== NOVA PERGUNTA ==========",
+            flush=True
+        )
+
+        print(
+            "Conversa:",
+            identificador,
+            flush=True
+        )
+
+        print(
+            "Pergunta:",
+            texto,
+            flush=True
+        )
 
         comando = texto.lower()
 
         # ==================================
-        # MENU E AJUDA
+        # COMANDO /menu
         # ==================================
 
         if comando == "/menu":
 
             resposta = gerar_menu()
 
+        # ==================================
+        # COMANDO /ajuda
+        # ==================================
+
         elif comando == "/ajuda":
 
             resposta = gerar_ajuda()
+
+        # ==================================
+        # COMANDO /sobre
+        # ==================================
 
         elif comando == "/sobre":
 
             resposta = gerar_sobre()
 
         # ==================================
-        # CONSULTAR ULTIMO PLANO
+        # COMANDO /plano
         # ==================================
 
         elif comando == "/plano":
@@ -359,40 +473,50 @@ def mensagem(client, evento):
 
                 if plano:
 
+                    texto_plano = json.dumps(
+                        plano,
+                        ensure_ascii=False,
+                        indent=2
+                    )
+
+                    # Evitar mensagens excessivas
+                    texto_plano = texto_plano[:3500]
+
                     resposta = (
-                        "🧠 *ÚLTIMO PLANO DA IA*\n\n"
-                        + json.dumps(
-                            plano,
-                            ensure_ascii=False,
-                            indent=2
-                        )
+                        "🧠 *ÚLTIMA PESQUISA DA IA*\n\n"
+                        + texto_plano
                     )
 
                 else:
 
                     resposta = (
-                        "Nenhum plano foi executado "
-                        "nesta conversa."
+                        "Nenhuma pesquisa foi "
+                        "realizada nesta conversa."
                     )
 
         # ==================================
-        # LIMPAR HISTORICO
+        # COMANDO /limpar
         # ==================================
 
         elif comando == "/limpar":
 
             with bloqueio:
+
                 conversas.pop(
-                    identificador, None
+                    identificador,
+                    None
                 )
 
             resposta = (
-                "🧹 Histórico e plano apagados!\n"
-                "Pode iniciar uma nova conversa."
+                "🧹 *Conversa reiniciada!*\n\n"
+                "O histórico, o planejamento "
+                "e os resultados anteriores "
+                "foram removidos da memória.\n\n"
+                "Pode enviar uma nova pergunta."
             )
 
         # ==================================
-        # PROCESSAMENTO AUTOMATICO
+        # PERGUNTA PARA OS DOIS AGENTES
         # ==================================
 
         else:
@@ -407,19 +531,20 @@ def mensagem(client, evento):
             except Exception as erro:
 
                 print(
-                    "Erro no processamento:",
+                    "❌ Erro no processamento:",
                     repr(erro),
                     flush=True
                 )
 
                 resposta = (
                     "⚠️ Não foi possível processar "
-                    "sua pergunta.\n"
-                    "Tente novamente mais tarde."
+                    "sua pergunta.\n\n"
+                    "Verifique se o Ollama está "
+                    "funcionando e tente novamente."
                 )
 
         # ==================================
-        # ENVIAR AO WHATSAPP
+        # ENVIAR RESPOSTA
         # ==================================
 
         enviar_resposta(
@@ -431,14 +556,14 @@ def mensagem(client, evento):
     except Exception as erro:
 
         print(
-            "Erro geral:",
+            "\n❌ Erro geral:",
             repr(erro),
             flush=True
         )
 
 
 # ==========================================
-# INICIAR
+# INICIAR APLICACAO
 # ==========================================
 
 if __name__ == "__main__":
@@ -446,5 +571,10 @@ if __name__ == "__main__":
     print("====================================")
     print("    WHATSAPP - DOIS AGENTES DE IA")
     print("====================================")
+
+    print(
+        "Iniciando chatbot...",
+        flush=True
+    )
 
     cliente.connect()
