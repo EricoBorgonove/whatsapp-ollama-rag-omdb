@@ -235,9 +235,9 @@ O `agente_planejador.py` solicita um plano com até quatro ações. Cada ação 
 | `omdb_busca` | Pesquisar títulos na primeira página da OMDb e, opcionalmente, consultar seus detalhes |
 | `contexto_anterior` | Reutilizar resultados armazenados da consulta anterior |
 
-O `motor_ferramentas.py` executa as ações em sequência e registra erros por ação nos resultados. O analista recebe esses resultados para gerar a resposta em português. As instruções orientam o modelo a citar arquivos e páginas nas respostas RAG e informar falhas ou ambiguidades nas consultas.
+O `motor_ferramentas.py` executa as ações em sequência e registra erros por ação nos resultados. Quando há resultados de ferramentas, o analista recebe esses dados para gerar a resposta em português. Se todas as ações forem `direto`, a resposta usa `consultar_ollama`, com o prompt de conversação geral e o histórico disponível. Se a lista de resultados estiver vazia, o motor retorna uma mensagem solicitando mais detalhes, sem fazer uma nova chamada ao modelo. As instruções orientam o modelo a citar arquivos e páginas nas respostas RAG e informar falhas ou ambiguidades nas consultas.
 
-O `bot_agentes.py` mantém histórico, último plano e últimos resultados separados por conversa, apenas em memória. Armazena até 12 mensagens, equivalentes a seis interações; o planejador e o analista recebem até as seis mensagens mais recentes desse histórico. `/limpar` remove todo esse estado.
+O `bot_agentes.py` mantém histórico, último plano e últimos resultados separados por conversa, apenas em memória. Armazena até 12 mensagens, equivalentes a seis interações; o planejador e o analista de ferramentas recebem até as seis mensagens mais recentes desse histórico. Na rota exclusivamente `direto`, o cliente de conversação recebe todo o histórico disponível, de até 12 mensagens. `/limpar` remove todo esse estado.
 
 Na versão por comandos, a recuperação RAG usa três trechos e o bot acrescenta as referências à resposta. Na versão com agentes, a quantidade depende do plano, e a citação é solicitada nas instruções do analista.
 
@@ -265,9 +265,9 @@ O teste de WhatsApp usa a mesma sessão dos bots e deve ser executado separadame
 
 ## Identificação de filmes na versão com agentes
 
-O motor normaliza títulos e inclui três correspondências didáticas: `Interestelar` → `Interstellar` (2014), `A Origem` → `Inception` (2010) e `Matrix` → `The Matrix` (1999). Outros títulos dependem das consultas à OMDb e do planejamento do modelo.
+O motor normaliza títulos e inclui cinco correspondências didáticas: `Interestelar` → `Interstellar` (2014), `A Origem` → `Inception` (2010), `Matrix` → `The Matrix` (1999), `O Cavaleiro das Trevas` → `The Dark Knight` (2008) e `Oppenheimer` → `Oppenheimer` (2023). Outros títulos dependem das consultas à OMDb e do planejamento do modelo.
 
-A identificação tenta a consulta por título e, se não obtiver candidatos, realiza uma busca mais ampla. Os candidatos são comparados pelo título normalizado e pelos filtros de ano e tipo quando informados. O código exige pontuação de pelo menos 0,92 e sinaliza ambiguidade quando os dois melhores candidatos aceitos têm diferença inferior a 0,03. Esses valores são heurísticas de comparação, não probabilidades de acerto.
+A identificação consulta por título e também realiza uma busca mais ampla, mesmo quando a primeira consulta encontra candidatos. Os resultados são reunidos pelo IMDb ID, preservando os dados da consulta direta quando a busca retorna a mesma obra. Os candidatos são comparados pelo título normalizado e pelos filtros de ano e tipo quando informados. Títulos vazios recebem pontuação zero. O código exige pontuação de pelo menos 0,92 e sinaliza ambiguidade quando os dois melhores candidatos aceitos têm diferença inferior a 0,03. Esses valores são heurísticas de comparação, não probabilidades de acerto.
 
 Quando uma obra é selecionada, seus detalhes são consultados pelo IMDb ID retornado pela API. O analista é instruído a não afirmar que identificou a obra quando `identificado` for falso. A pesquisa OMDb é baseada em títulos; o projeto não oferece busca geral por diretor, gênero ou maiores bilheterias.
 
@@ -278,7 +278,7 @@ Quando uma obra é selecionada, seus detalhes são consultados pelo IMDb ID reto
 - A busca RAG retorna os trechos mais semelhantes sem aplicar um limiar mínimo de relevância. As referências exibidas indicam os trechos recuperados e não garantem que toda afirmação da resposta esteja sustentada por eles.
 - O índice JSON é carregado e percorrido a cada busca, uma abordagem simples para fins didáticos e bases pequenas.
 - O bloqueio usado na conversação com histórico permanece ativo durante a consulta ao Ollama. No bot com agentes, ele abrange planejamento, ferramentas e análise, serializando o processamento entre conversas.
-- A versão com agentes realiza duas chamadas ao modelo por pergunta, além das consultas às ferramentas, podendo levar mais tempo que a versão básica.
+- A versão com agentes normalmente realiza duas chamadas ao modelo por pergunta: planejamento e resposta, além das consultas às ferramentas. Se não houver resultados para analisar, retorna uma orientação local após o planejamento, sem a segunda chamada. A busca adicional de candidatos pode aumentar o número de requisições à OMDb.
 - A seleção das ferramentas e a redação final dependem do modelo; os limites do plano e a validação de títulos não garantem respostas corretas.
 - O planejamento exige suporte ao formato estruturado do Ollama e do modelo. Um JSON inválido pode interromper o processamento da pergunta.
 - As dependências não têm versões fixadas em `requirements.txt`.
