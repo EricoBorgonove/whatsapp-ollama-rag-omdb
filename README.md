@@ -188,17 +188,18 @@ Para encerrar o processo, pressione `Ctrl+C` no terminal.
 
 | Comando | Ação | Disponibilidade |
 | --- | --- | --- |
-| `/menu` | Exibe os comandos | Ambas as versões |
-| `/ajuda` | Mostra instruções e exemplos | Ambas as versões |
-| `/sobre` | Apresenta o assistente | Ambas as versões |
-| `/limpar` | Remove o histórico da conversa atual | Ambas as versões |
+| `/menu` | Exibe os comandos | Todas as versões |
+| `/ajuda` | Mostra instruções e exemplos | Todas as versões |
+| `/sobre` | Apresenta o assistente | Todas as versões |
+| `/limpar` | Remove o histórico; na versão com agentes também remove o plano e os resultados armazenados | Todas as versões |
+| `/plano` | Mostra o último plano JSON armazenado na conversa | Bot com agentes |
 | `/ia Explique aprendizado de máquina` | Conversa com o modelo local | Bot estendido |
 | `/rag O que é a taxonomia de Bloom?` | Consulta os PDFs indexados | Bot estendido |
 | `/documentos` | Lista arquivos e quantidade de páginas indexadas | Bot estendido |
 | `/filme Interstellar` | Consulta detalhes de um título e gera uma resposta com Ollama | Bot estendido |
 | `/buscarfilme Batman` | Lista até cinco resultados da OMDb | Bot estendido |
 
-No bot básico, envie texto livre para conversar. No bot estendido, perguntas devem acompanhar um comando; texto livre recebe uma orientação para consultar o menu.
+No bot básico, envie texto livre para conversar. No bot por comandos, perguntas devem acompanhar um comando; texto livre recebe uma orientação para consultar o menu. No bot com agentes, envie a pergunta diretamente: não é necessário usar `/ia`, `/rag` ou `/filme`. Os comandos de controle dessa versão são `/menu`, `/ajuda`, `/sobre`, `/plano` e `/limpar`.
 
 ## Como funciona o RAG
 
